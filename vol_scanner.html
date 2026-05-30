@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vol Scanner & Watchlist</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0e12; --surf:#111418; --panel:#161a20;
+  --b1:rgba(255,255,255,.06); --b2:rgba(255,255,255,.10);
+  --t1:#e2e8f0; --t2:#8896a8; --t3:#3d4f63;
+  --accent:#3b82f6; --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
+  --strike:#e8dcc8;
+  /* heatmap diverging scale: cheap(blue/cool) ↔ rich(red/warm) */
+  --mono:'DM Mono',monospace; --sans:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);font-family:var(--sans);font-size:13px;color:var(--t1);}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px;}
+
+/* HEADER */
+.hd{display:flex;align-items:center;height:46px;background:var(--surf);border-bottom:1px solid var(--b1);padding:0 18px;gap:14px;}
+.hd-title{font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--t1);}
+.hd-title .sub{color:var(--t3);font-weight:400;margin-left:6px;font-size:11px;}
+.hd-sep{width:1px;height:20px;background:var(--b2);}
+.lookback-group{display:flex;align-items:center;gap:3px;margin-left:auto;}
+.lb-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-right:6px;}
+.lb-btn{padding:4px 11px;border-radius:3px;border:1px solid transparent;background:transparent;color:var(--t3);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .1s;}
+.lb-btn:hover{color:var(--t2);border-color:var(--b2);}
+.lb-btn.on{color:var(--t1);border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.08);}
+
+/* normalization toggle */
+.norm-group{display:flex;align-items:center;gap:3px;}
+.norm-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-right:6px;}
+.norm-seg{display:flex;border:1px solid var(--b2);border-radius:3px;overflow:hidden;}
+.norm-b{padding:4px 10px;font-family:var(--mono);font-size:9px;font-weight:500;background:transparent;border:none;color:var(--t3);cursor:pointer;letter-spacing:.05em;text-transform:uppercase;transition:all .1s;}
+.norm-b.on{background:rgba(59,130,246,.15);color:var(--accent);}
+.norm-b:not(.on):hover{background:rgba(255,255,255,.04);color:var(--t2);}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:minmax(420px,1fr) minmax(520px,1.2fr);gap:0;height:calc(100vh - 46px - 26px);}
+.left-col{border-right:1px solid var(--b1);overflow-y:auto;}
+.right-col{overflow-y:auto;}
+
+/* WATCHLIST */
+.section-hd{display:flex;align-items:center;gap:8px;padding:10px 16px 6px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);position:sticky;top:0;background:var(--bg);z-index:5;}
+.section-hd .count{color:var(--t3);font-family:var(--mono);}
+
+.wl-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;}
+.wl-table thead th{position:sticky;top:30px;background:var(--surf);padding:6px 10px;font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);text-align:right;border-bottom:1px solid var(--b2);white-space:nowrap;z-index:4;}
+.wl-table thead th:first-child{text-align:left;}
+.wl-table tbody tr{border-bottom:1px solid var(--b1);cursor:pointer;transition:background .08s;}
+.wl-table tbody tr:hover{background:rgba(255,255,255,.025);}
+.wl-table tbody tr.sel{background:rgba(59,130,246,.08);}
+.wl-table tbody tr.sel td:first-child{box-shadow:inset 2px 0 0 var(--accent);}
+.wl-table td{padding:7px 10px;text-align:right;white-space:nowrap;color:var(--t2);}
+.wl-table td:first-child{text-align:left;}
+.wl-sym{font-weight:600;color:var(--t1);font-size:12px;}
+.wl-name{font-size:9px;color:var(--t3);font-family:var(--sans);margin-top:1px;}
+.wl-px{color:var(--t1);}
+.chg{font-family:var(--mono);}
+.chg-pos{color:var(--green);} .chg-neg{color:var(--red);}
+/* mini spark cell */
+.spark{display:inline-block;vertical-align:middle;}
+/* IVR pill */
+.ivr-pill{display:inline-block;padding:1px 6px;border-radius:2px;font-size:10px;font-family:var(--mono);}
+
+/* DETAIL PANEL */
+.detail-hd{padding:14px 18px 10px;border-bottom:1px solid var(--b1);position:sticky;top:0;background:var(--bg);z-index:5;}
+.dh-row1{display:flex;align-items:baseline;gap:10px;margin-bottom:3px;}
+.dh-sym{font-size:18px;font-weight:600;color:var(--t1);font-family:var(--mono);letter-spacing:.02em;}
+.dh-name{font-size:12px;color:var(--t2);}
+.dh-px{font-family:var(--mono);font-size:16px;color:var(--t1);margin-left:auto;}
+.dh-chg{font-family:var(--mono);font-size:12px;}
+.dh-row2{display:flex;gap:18px;margin-top:8px;}
+.dh-stat{display:flex;flex-direction:column;gap:1px;}
+.dh-sl{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);}
+.dh-sv{font-family:var(--mono);font-size:12px;color:var(--t2);}
+
+.detail-body{padding:16px 18px;}
+.panel-title{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.panel-title .hint{color:var(--t3);font-weight:400;letter-spacing:0;text-transform:none;font-size:10px;}
+
+/* HEATMAP */
+.heatmap-wrap{margin-bottom:24px;}
+.hm-table{border-collapse:separate;border-spacing:3px;font-family:var(--mono);font-size:11px;width:100%;}
+.hm-table th{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--t3);padding:3px 6px;}
+.hm-table th.col-h{text-align:center;}
+.hm-table th.row-h{text-align:right;padding-right:10px;color:var(--t2);white-space:nowrap;}
+.hm-cell{position:relative;border-radius:3px;padding:7px 8px;text-align:center;cursor:default;transition:transform .08s;min-width:60px;}
+.hm-cell:hover{transform:scale(1.06);z-index:2;box-shadow:0 2px 10px rgba(0,0,0,.4);}
+.hm-val{font-family:var(--mono);font-size:12px;font-weight:500;line-height:1.1;}
+.hm-pct{font-family:var(--mono);font-size:9px;opacity:.7;margin-top:2px;}
+
+/* legend */
+.hm-legend{display:flex;align-items:center;gap:0;margin-top:10px;}
+.hm-legend .lg-lbl{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;}
+.hm-grad{height:8px;width:160px;border-radius:2px;margin:0 8px;background:linear-gradient(90deg,#2563eb,#1e293b 50%,#dc2626);}
+.lg-tick{font-family:var(--mono);font-size:9px;color:var(--t3);}
+
+/* TERM STRUCTURE */
+.ts-controls{display:flex;align-items:center;gap:3px;margin-bottom:10px;}
+.ts-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-right:6px;}
+.ts-btn{padding:3px 10px;border-radius:3px;border:1px solid transparent;background:transparent;color:var(--t3);font-family:var(--mono);font-size:10px;cursor:pointer;transition:all .1s;}
+.ts-btn:hover{color:var(--t2);border-color:var(--b2);}
+.ts-btn.on{color:var(--t1);border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.08);}
+canvas{display:block;width:100%;}
+.ts-legend{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;}
+.ts-lg{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3);}
+.ts-dot{width:8px;height:3px;border-radius:1px;}
+
+/* STATUS BAR */
+.sb{display:flex;align-items:center;gap:16px;height:26px;padding:0 18px;background:var(--bg);border-top:1px solid var(--b1);font-size:10px;color:var(--t3);}
+.sb .hl{font-family:var(--mono);color:var(--t2);}
+.ldot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2.4s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* tooltip */
+.tip{position:fixed;z-index:99;background:var(--panel);border:1px solid var(--b2);border-radius:4px;padding:8px 10px;font-family:var(--mono);font-size:10px;color:var(--t1);pointer-events:none;opacity:0;transition:opacity .12s;max-width:220px;line-height:1.5;}
+.tip.show{opacity:1;}
+.tip .tip-k{color:var(--t3);} .tip .tip-v{color:var(--t1);}
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <div class="hd-title">Vol Scanner <span class="sub">/ watchlist · idea generation</span></div>
+  <div class="hd-sep"></div>
+  <div class="norm-group">
+    <span class="norm-lbl">Heatmap</span>
+    <div class="norm-seg" id="norm-seg">
+      <button class="norm-b on" data-norm="change" onclick="setNorm('change')">Δ Vol</button>
+      <button class="norm-b" data-norm="pctile" onclick="setNorm('pctile')">Percentile</button>
+      <button class="norm-b" data-norm="zscore" onclick="setNorm('zscore')">Z-Score</button>
+    </div>
+  </div>
+  <div class="lookback-group">
+    <span class="lb-lbl">Lookback</span>
+    <button class="lb-btn" data-lb="1" onclick="setLookback(1)">1D</button>
+    <button class="lb-btn on" data-lb="3" onclick="setLookback(3)">3D</button>
+    <button class="lb-btn" data-lb="7" onclick="setLookback(7)">7D</button>
+    <button class="lb-btn" data-lb="30" onclick="setLookback(30)">30D</button>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- LEFT: WATCHLIST -->
+  <div class="left-col">
+    <div class="section-hd">Watchlist <span class="count" id="wl-count"></span></div>
+    <table class="wl-table">
+      <thead>
+        <tr>
+          <th style="text-align:left">Symbol</th>
+          <th>Last</th>
+          <th>1D</th><th>3D</th><th>7D</th><th>30D</th>
+          <th>30D Trend</th>
+          <th>IV30</th><th>IVR</th>
+        </tr>
+      </thead>
+      <tbody id="wl-body"></tbody>
+    </table>
+  </div>
+
+  <!-- RIGHT: DETAIL -->
+  <div class="right-col">
+    <div class="detail-hd" id="detail-hd"></div>
+    <div class="detail-body">
+      <!-- HEATMAP -->
+      <div class="heatmap-wrap">
+        <div class="panel-title">Fixed-Strike IV Change <span class="hint" id="hm-hint">— how vol moved over lookback, by delta × maturity</span></div>
+        <div style="overflow-x:auto"><table class="hm-table" id="hm-table"></table></div>
+        <div class="hm-legend" id="hm-legend"></div>
+      </div>
+      <!-- TERM STRUCTURE -->
+      <div>
+        <div class="panel-title">IV Term Structure <span class="hint">— current vs lookback, by maturity</span></div>
+        <div class="ts-controls">
+          <span class="ts-lbl">Delta</span>
+          <button class="ts-btn" data-d="25p" onclick="setTsDelta('25p')">25Δ Put</button>
+          <button class="ts-btn on" data-d="50" onclick="setTsDelta('50')">50Δ (ATM)</button>
+          <button class="ts-btn" data-d="25c" onclick="setTsDelta('25c')">25Δ Call</button>
+        </div>
+        <canvas id="ts-canvas" height="220"></canvas>
+        <div class="ts-legend">
+          <div class="ts-lg"><div class="ts-dot" style="background:var(--accent)"></div>Current IV</div>
+          <div class="ts-lg"><div class="ts-dot" style="background:var(--t3)"></div>Lookback IV</div>
+          <div class="ts-lg"><div class="ts-dot" style="background:var(--amber);opacity:.6"></div>±1σ band</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sb">
+  <div style="display:flex;align-items:center;gap:5px"><div class="ldot"></div><span>Live</span></div>
+  <span>Lookback <span class="hl" id="sb-lb">3D</span></span>
+  <span>Mode <span class="hl" id="sb-norm">Δ Vol</span></span>
+  <span style="margin-left:auto;font-size:9px;opacity:.3">Simulated data · diverging scale: blue = vol cheapening, red = vol richening</span>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+//  Deterministic pseudo-random so each symbol is stable per load
+// ─────────────────────────────────────────────────────────────
+function seededRand(seed){
+  let s=seed%2147483647; if(s<=0)s+=2147483646;
+  return ()=>{ s=s*16807%2147483647; return (s-1)/2147483646; };
+}
+function hashStr(str){ let h=0; for(let i=0;i<str.length;i++){h=(h*31+str.charCodeAt(i))|0;} return Math.abs(h); }
+
+// ─────────────────────────────────────────────────────────────
+//  Universe
+// ─────────────────────────────────────────────────────────────
+const UNIVERSE=[
+  {sym:'AAPL',name:'Apple Inc',px:182.63},
+  {sym:'NVDA',name:'NVIDIA Corp',px:131.26},
+  {sym:'TSLA',name:'Tesla Inc',px:248.50},
+  {sym:'SPY', name:'S&P 500 ETF',px:548.20},
+  {sym:'QQQ', name:'Nasdaq 100 ETF',px:472.85},
+  {sym:'AMD', name:'Adv Micro Devices',px:158.40},
+  {sym:'META',name:'Meta Platforms',px:512.30},
+  {sym:'AMZN',name:'Amazon.com',px:185.90},
+  {sym:'MSFT',name:'Microsoft Corp',px:441.58},
+  {sym:'GOOGL',name:'Alphabet Inc',px:178.35},
+  {sym:'COIN',name:'Coinbase Global',px:242.10},
+  {sym:'GME', name:'GameStop Corp',px:24.80},
+];
+
+const TENORS=[
+  {lbl:'7d',dte:7},{lbl:'14d',dte:14},{lbl:'30d',dte:30},
+  {lbl:'60d',dte:60},{lbl:'90d',dte:90},{lbl:'180d',dte:180},
+];
+const DELTAS=[{lbl:'25Δ Put',key:'25p'},{lbl:'50Δ ATM',key:'50'},{lbl:'25Δ Call',key:'25c'}];
+
+let lookback=3, norm='change', selSym='AAPL', tsDelta='50';
+
+// ─────────────────────────────────────────────────────────────
+//  Build per-symbol vol surface + history
+//  For each symbol, each delta, each tenor we synthesize:
+//   - current IV
+//   - IV `lookback` days ago
+//   - a trailing distribution (mean, std) to compute pctile/z
+// ─────────────────────────────────────────────────────────────
+function buildSymbolData(sym){
+  const seed=hashStr(sym);
+  const rnd=seededRand(seed);
+  // base ATM vol level for the name
+  const baseVol=0.18+rnd()*0.45;          // 18%–63%
+  const rvBias=(rnd()-0.5)*0.04;          // realized-vs-implied bias
+
+  // price action
+  const chg=k=>{
+    const r=seededRand(seed+k*97);
+    return (r()-0.48)* (k===1?2.2 : k===3?3.8 : k===7?6.0 : 12.0);
+  };
+  const priceAction={1:chg(1),3:chg(3),7:chg(7),30:chg(30)};
+
+  // spark series (30 pts)
+  const spark=[];
+  { const r=seededRand(seed+555); let v=100;
+    for(let i=0;i<30;i++){ v*=1+(r()-0.49)*0.025; spark.push(v); } }
+
+  // surface: for each delta+tenor build current/prev IV and stats
+  const surf={};
+  DELTAS.forEach(d=>{
+    surf[d.key]={};
+    TENORS.forEach(t=>{
+      const r=seededRand(seed + hashStr(d.key)*7 + t.dte*13);
+      // term structure: shorter tenors more reactive, contango/backwardation
+      const termAdj=(t.dte<30? 0.03 : -0.01*(t.dte/180));
+      // skew: puts richer
+      const skewAdj=d.key==='25p'? 0.035 : d.key==='25c'? -0.012 : 0;
+      const curIV=Math.max(0.05, baseVol+termAdj+skewAdj+(r()-0.5)*0.05);
+      // trailing stats for normalization
+      const histMean=curIV - rvBias*0.5;
+      const histStd=Math.max(0.008, curIV*0.10*(t.dte<30?1.4:1));
+      // IV `lookback` days ago — pull from a path
+      const lbMove=(r2=>{ return (r2()-0.5); })(seededRand(seed+t.dte+hashStr(d.key)+lookback*31));
+      surf[d.key][t.dte]={curIV,histMean,histStd,lbSeed:seed+t.dte+hashStr(d.key)};
+    });
+  });
+
+  // IV30 + IV rank
+  const iv30=surf['50'][30].curIV;
+  const ivr=Math.round(((iv30-surf['50'][30].histMean)/(surf['50'][30].histStd*4)+0.5)*100);
+  return {priceAction,spark,surf,baseVol,iv30,ivr:Math.max(2,Math.min(98,ivr)),rvBias};
+}
+
+// IV `lookback` days ago for a given cell — deterministic per lookback
+function ivLookbackAgo(cell,lb){
+  const r=seededRand(cell.lbSeed + lb*101);
+  // bigger lookback → potentially bigger move
+  const scale = lb===1?0.012 : lb===3?0.022 : lb===7?0.038 : 0.07;
+  const move=(r()-0.5)*2*scale + (r()-0.5)*scale*0.5;
+  return Math.max(0.04, cell.curIV - move);
+}
+
+const DATA={};
+UNIVERSE.forEach(u=>DATA[u.sym]=buildSymbolData(u.sym));
+
+// ─────────────────────────────────────────────────────────────
+//  Heatmap color scale (diverging)
+//  metric centered at 0 → slate; negative → blue (cheapening); positive → red (richening)
+// ─────────────────────────────────────────────────────────────
+function lerp(a,b,t){return a+(b-a)*t;}
+function divergingColor(v, maxAbs){
+  // v in [-maxAbs, maxAbs]
+  const t=Math.max(-1,Math.min(1, v/maxAbs));
+  const mid=[30,41,59];      // slate-800
+  const cool=[37,99,235];    // blue-600
+  const warm=[220,38,38];    // red-600
+  let c;
+  if(t<0){ const k=-t; c=[lerp(mid[0],cool[0],k),lerp(mid[1],cool[1],k),lerp(mid[2],cool[2],k)]; }
+  else   { const k= t; c=[lerp(mid[0],warm[0],k),lerp(mid[1],warm[1],k),lerp(mid[2],warm[2],k)]; }
+  return `rgb(${c.map(x=>Math.round(x)).join(',')})`;
+}
+function cellTextColor(v,maxAbs){
+  const t=Math.abs(v/maxAbs);
+  return t>0.55?'#fff':'var(--t1)';
+}
+
+// compute the metric for a cell given current normalization
+function cellMetric(cell,lb){
+  const prev=ivLookbackAgo(cell,lb);
+  const change=(cell.curIV-prev)*100;          // vol points
+  const z=(cell.curIV-cell.histMean)/cell.histStd;
+  // percentile from z (normal CDF approx)
+  const pctile=normCDF(z)*100;
+  return {change,z,pctile,prev,cur:cell.curIV};
+}
+function normCDF(x){
+  const a=[.254829592,-.284496736,1.421413741,-1.453152027,1.061405429],p=.3275911;
+  const s=x<0?-1:1,t=1/(1+p*Math.abs(x));
+  return .5*(1+s*(1-((((a[4]*t+a[3])*t+a[2])*t+a[1])*t+a[0])*t*Math.exp(-x*x/2)));
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Sparkline SVG
+// ─────────────────────────────────────────────────────────────
+function sparkSVG(series,w,h){
+  const min=Math.min(...series),max=Math.max(...series),rng=max-min||1;
+  const pts=series.map((v,i)=>{
+    const x=(i/(series.length-1))*w;
+    const y=h-((v-min)/rng)*h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const up=series[series.length-1]>=series[0];
+  const col=up?'#22c55e':'#ef4444';
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.2" opacity="0.85"/>
+  </svg>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Render watchlist
+// ─────────────────────────────────────────────────────────────
+function renderWatchlist(){
+  document.getElementById('wl-count').textContent=UNIVERSE.length+' names';
+  const body=document.getElementById('wl-body');
+  const chgCell=v=>{
+    const cls=v>=0?'chg-pos':'chg-neg';
+    return `<td class="chg ${cls}">${v>=0?'+':''}${v.toFixed(2)}%</td>`;
+  };
+  body.innerHTML=UNIVERSE.map(u=>{
+    const d=DATA[u.sym];
+    const ivrColor=d.ivr>=70?'rgba(239,68,68,.15);color:#ef4444'
+                  :d.ivr<=30?'rgba(34,197,94,.12);color:#22c55e'
+                  :'rgba(255,255,255,.06);color:var(--t2)';
+    return `<tr data-sym="${u.sym}" class="${u.sym===selSym?'sel':''}" onclick="selectSym('${u.sym}')">
+      <td><div class="wl-sym">${u.sym}</div><div class="wl-name">${u.name}</div></td>
+      <td class="wl-px">${u.px.toFixed(2)}</td>
+      ${chgCell(d.priceAction[1])}
+      ${chgCell(d.priceAction[3])}
+      ${chgCell(d.priceAction[7])}
+      ${chgCell(d.priceAction[30])}
+      <td>${sparkSVG(d.spark,60,18)}</td>
+      <td style="color:var(--t1)">${(d.iv30*100).toFixed(1)}%</td>
+      <td><span class="ivr-pill" style="background:${ivrColor}">${d.ivr}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Render detail header
+// ─────────────────────────────────────────────────────────────
+function renderDetailHeader(){
+  const u=UNIVERSE.find(x=>x.sym===selSym), d=DATA[selSym];
+  const ch1=d.priceAction[1];
+  document.getElementById('detail-hd').innerHTML=`
+    <div class="dh-row1">
+      <span class="dh-sym">${u.sym}</span>
+      <span class="dh-name">${u.name}</span>
+      <span class="dh-px">${u.px.toFixed(2)}</span>
+      <span class="dh-chg ${ch1>=0?'chg-pos':'chg-neg'}">${ch1>=0?'+':''}${ch1.toFixed(2)}% 1D</span>
+    </div>
+    <div class="dh-row2">
+      <div class="dh-stat"><span class="dh-sl">IV30</span><span class="dh-sv">${(d.iv30*100).toFixed(1)}%</span></div>
+      <div class="dh-stat"><span class="dh-sl">IV Rank</span><span class="dh-sv">${d.ivr}</span></div>
+      <div class="dh-stat"><span class="dh-sl">3D</span><span class="dh-sv ${d.priceAction[3]>=0?'chg-pos':'chg-neg'}">${d.priceAction[3]>=0?'+':''}${d.priceAction[3].toFixed(2)}%</span></div>
+      <div class="dh-stat"><span class="dh-sl">7D</span><span class="dh-sv ${d.priceAction[7]>=0?'chg-pos':'chg-neg'}">${d.priceAction[7]>=0?'+':''}${d.priceAction[7].toFixed(2)}%</span></div>
+      <div class="dh-stat"><span class="dh-sl">30D</span><span class="dh-sv ${d.priceAction[30]>=0?'chg-pos':'chg-neg'}">${d.priceAction[30]>=0?'+':''}${d.priceAction[30].toFixed(2)}%</span></div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Render heatmap
+// ─────────────────────────────────────────────────────────────
+function renderHeatmap(){
+  const d=DATA[selSym];
+  // gather all metrics first to set a consistent color scale
+  const metricVals=[];
+  DELTAS.forEach(dl=>TENORS.forEach(t=>{
+    const m=cellMetric(d.surf[dl.key][t.dte],lookback);
+    metricVals.push(norm==='change'?m.change:norm==='zscore'?m.z:(m.pctile-50)/50*2);
+  }));
+  const maxAbs=norm==='change'?Math.max(2,...metricVals.map(Math.abs))
+              :norm==='zscore'?Math.max(1.5,...metricVals.map(Math.abs))
+              :2;
+
+  let html='<thead><tr><th class="row-h"></th>';
+  TENORS.forEach(t=>html+=`<th class="col-h">${t.lbl}</th>`);
+  html+='</tr></thead><tbody>';
+
+  DELTAS.forEach(dl=>{
+    html+=`<tr><th class="row-h">${dl.lbl}</th>`;
+    TENORS.forEach(t=>{
+      const cell=d.surf[dl.key][t.dte];
+      const m=cellMetric(cell,lookback);
+      let metric, valTxt, pctTxt;
+      if(norm==='change'){ metric=m.change; valTxt=(m.change>=0?'+':'')+m.change.toFixed(2); pctTxt='p'+Math.round(m.pctile); }
+      else if(norm==='zscore'){ metric=m.z; valTxt=(m.z>=0?'+':'')+m.z.toFixed(2)+'σ'; pctTxt=(m.change>=0?'+':'')+m.change.toFixed(1)+'v'; }
+      else { metric=(m.pctile-50)/50*2; valTxt=Math.round(m.pctile)+'%'; pctTxt=(m.change>=0?'+':'')+m.change.toFixed(1)+'v'; }
+      const bg=divergingColor(metric,maxAbs);
+      const tc=cellTextColor(metric,maxAbs);
+      html+=`<td><div class="hm-cell" style="background:${bg}"
+        onmousemove="cellTip(event,'${selSym}','${dl.key}','${dl.lbl}',${t.dte},'${t.lbl}')"
+        onmouseleave="hideTip()">
+        <div class="hm-val" style="color:${tc}">${valTxt}</div>
+        <div class="hm-pct" style="color:${tc}">${pctTxt}</div>
+      </div></td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody>';
+  document.getElementById('hm-table').innerHTML=html;
+
+  // legend
+  const lbLabels=norm==='change'?['−'+maxAbs.toFixed(1)+'v','0','+'+maxAbs.toFixed(1)+'v']
+                :norm==='zscore'?['−'+maxAbs.toFixed(1)+'σ','0','+'+maxAbs.toFixed(1)+'σ']
+                :['0%','50%','100%'];
+  document.getElementById('hm-legend').innerHTML=`
+    <span class="lg-lbl">Cheaper</span>
+    <span class="lg-tick">${lbLabels[0]}</span>
+    <div class="hm-grad"></div>
+    <span class="lg-tick">${lbLabels[2]}</span>
+    <span class="lg-lbl">Richer</span>`;
+
+  const hints={change:'— change in IV (vol points) over lookback; subscript = percentile rank',
+               pctile:'— percentile rank of current IV vs trailing history; subscript = vol-point change',
+               zscore:'— standard deviations from trailing mean; subscript = vol-point change'};
+  document.getElementById('hm-hint').textContent=hints[norm];
+}
+
+// tooltip
+function cellTip(e,sym,dkey,dlbl,dte,tlbl){
+  const cell=DATA[sym].surf[dkey][dte];
+  const m=cellMetric(cell,lookback);
+  const tip=document.getElementById('tip');
+  tip.innerHTML=`<div><span class="tip-v">${sym} · ${dlbl} · ${tlbl}</span></div>
+    <div><span class="tip-k">Current IV</span> <span class="tip-v">${(m.cur*100).toFixed(2)}%</span></div>
+    <div><span class="tip-k">${lookback}D ago</span> <span class="tip-v">${(m.prev*100).toFixed(2)}%</span></div>
+    <div><span class="tip-k">Change</span> <span class="tip-v">${m.change>=0?'+':''}${m.change.toFixed(2)} vol pts</span></div>
+    <div><span class="tip-k">Percentile</span> <span class="tip-v">${Math.round(m.pctile)}th</span></div>
+    <div><span class="tip-k">Z-score</span> <span class="tip-v">${m.z>=0?'+':''}${m.z.toFixed(2)}σ</span></div>`;
+  tip.classList.add('show');
+  const pad=14;
+  let x=e.clientX+pad, y=e.clientY+pad;
+  if(x+230>window.innerWidth) x=e.clientX-230;
+  if(y+120>window.innerHeight) y=e.clientY-120;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+function hideTip(){ document.getElementById('tip').classList.remove('show'); }
+
+// ─────────────────────────────────────────────────────────────
+//  Render term structure
+// ─────────────────────────────────────────────────────────────
+function renderTermStructure(){
+  const cv=document.getElementById('ts-canvas');
+  const W=cv.parentElement.offsetWidth||640; cv.width=W; cv.height=220;
+  const ctx=cv.getContext('2d'); ctx.clearRect(0,0,W,220);
+  const d=DATA[selSym];
+
+  const cur=[], prev=[], up=[], dn=[];
+  TENORS.forEach(t=>{
+    const cell=d.surf[tsDelta][t.dte];
+    const m=cellMetric(cell,lookback);
+    cur.push(m.cur*100); prev.push(m.prev*100);
+    up.push((cell.histMean+cell.histStd)*100);
+    dn.push((cell.histMean-cell.histStd)*100);
+  });
+
+  const all=[...cur,...prev,...up,...dn];
+  const minV=Math.min(...all)-1, maxV=Math.max(...all)+1;
+  const pL=46,pR=16,pT=12,pB=34,cW=W-pL-pR,cH=220-pT-pB;
+  const xp=i=>pL+(i/(TENORS.length-1))*cW;
+  const yp=v=>pT+(maxV-v)/(maxV-minV)*cH;
+
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,.04)'; ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){ const v=minV+(maxV-minV)*i/5,y=yp(v);
+    ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pR,y);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.18)';ctx.font='9px DM Mono,monospace';ctx.textAlign='right';
+    ctx.fillText(v.toFixed(1)+'%',pL-5,y+3);
+  }
+  ctx.fillStyle='rgba(255,255,255,.2)';ctx.font='9px DM Mono,monospace';ctx.textAlign='center';
+  TENORS.forEach((t,i)=>ctx.fillText(t.lbl,xp(i),pT+cH+16));
+
+  // ±1σ band
+  ctx.fillStyle='rgba(245,158,11,.07)';
+  ctx.beginPath();
+  up.forEach((v,i)=>i?ctx.lineTo(xp(i),yp(v)):ctx.moveTo(xp(i),yp(v)));
+  for(let i=dn.length-1;i>=0;i--)ctx.lineTo(xp(i),yp(dn[i]));
+  ctx.closePath(); ctx.fill();
+
+  // prev (lookback) line — dashed grey
+  ctx.strokeStyle='rgba(120,140,165,.55)'; ctx.lineWidth=1.3; ctx.setLineDash([4,3]);
+  ctx.beginPath(); prev.forEach((v,i)=>i?ctx.lineTo(xp(i),yp(v)):ctx.moveTo(xp(i),yp(v))); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // current line — blue
+  ctx.strokeStyle='rgba(59,130,246,.9)'; ctx.lineWidth=2;
+  ctx.beginPath(); cur.forEach((v,i)=>i?ctx.lineTo(xp(i),yp(v)):ctx.moveTo(xp(i),yp(v))); ctx.stroke();
+  // dots + value labels on current
+  cur.forEach((v,i)=>{
+    ctx.beginPath();ctx.arc(xp(i),yp(v),3,0,Math.PI*2);ctx.fillStyle='#3b82f6';ctx.fill();
+    ctx.fillStyle='rgba(226,232,240,.7)';ctx.font='9px DM Mono,monospace';ctx.textAlign='center';
+    ctx.fillText(v.toFixed(1),xp(i),yp(v)-8);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Controls
+// ─────────────────────────────────────────────────────────────
+function selectSym(sym){
+  selSym=sym;
+  document.querySelectorAll('#wl-body tr').forEach(tr=>tr.classList.toggle('sel',tr.dataset.sym===sym));
+  renderDetailHeader(); renderHeatmap(); renderTermStructure();
+}
+function setLookback(lb){
+  lookback=lb;
+  document.querySelectorAll('.lb-btn').forEach(b=>b.classList.toggle('on',parseInt(b.dataset.lb)===lb));
+  document.getElementById('sb-lb').textContent=lb+'D';
+  renderHeatmap(); renderTermStructure();
+}
+function setNorm(n){
+  norm=n;
+  document.querySelectorAll('#norm-seg .norm-b').forEach(b=>b.classList.toggle('on',b.dataset.norm===n));
+  const lbl={change:'Δ Vol',pctile:'Percentile',zscore:'Z-Score'}[n];
+  document.getElementById('sb-norm').textContent=lbl;
+  renderHeatmap();
+}
+function setTsDelta(dk){
+  tsDelta=dk;
+  document.querySelectorAll('.ts-btn').forEach(b=>b.classList.toggle('on',b.dataset.d===dk));
+  renderTermStructure();
+}
+
+window.addEventListener('resize',renderTermStructure);
+window.selectSym=selectSym;window.setLookback=setLookback;window.setNorm=setNorm;
+window.setTsDelta=setTsDelta;window.cellTip=cellTip;window.hideTip=hideTip;
+
+// init
+renderWatchlist();
+renderDetailHeader();
+renderHeatmap();
+renderTermStructure();
+</script>
+</body>
+</html>
