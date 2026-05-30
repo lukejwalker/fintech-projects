@@ -34,6 +34,22 @@ and execution desks.
 
 ---
 
+### Vol Scanner
+**[Live Demo](https://lukejwalker.github.io/fintech-projects/vol_scanner.html)**
+
+A volatility surface scanner built for pre-trade idea generation. Includes:
+
+- Watchlist with IVR pills, price and realized vol context
+- IV heatmap across delta buckets and tenors with hover tooltips
+- Three normalization modes: vol-point change, percentile rank and z-score
+- Lookback toggle (1D, 3D, 7D, 30D) for comparing surface shifts
+- Term structure chart with ±1σ historical band and lookback overlay
+
+Built in vanilla HTML/CSS/JavaScript with simulated surface data. Reflects
+actual pre-trade workflows from institutional options desks.
+
+---
+
 ## Connect
 
 [LinkedIn](https://www.linkedin.com/in/lukejwalker/) · [GitHub](https://github.com/lukejwalker)
