@@ -473,7 +473,11 @@ function render(){
       const ivCell=e.target.closest('[data-iv]');
       if(ivCell){ivCellClick(ivCell);return;}
       if(e.shiftKey){addLeg(i);return;}
-      selectRow(i,tr,'px',null);
+      const cell=e.target;
+      const isBid=cell.classList.contains('cb');
+      const isAsk=cell.classList.contains('ca');
+      const side=isAsk?'b':isBid?'s':null;
+      selectRow(i,tr,'px',null,side);
     });
     tb.appendChild(tr);
   });
@@ -488,18 +492,27 @@ function ivCellClick(cell){
   selectRow(i,document.querySelectorAll('#tbody tr')[i],'vol',{tp,volDefault});
 }
 
-function selectRow(i,tr,defaultMode,volOpts){
+function selectRow(i,tr,defaultMode,volOpts,side){
   document.querySelectorAll('#tbody tr').forEach(r=>r.classList.remove('sel'));
-  if(selIdx===i&&!volOpts){selIdx=null;resetTicket();return;}
+  if(selIdx===i&&!volOpts&&!side){selIdx=null;resetTicket();return;}
   selIdx=i; tr.classList.add('sel');
   if(volOpts){modes[volOpts.tp]='vol';modes[volOpts.tp==='c'?'p':'c']='px';}
   else{modes.c=defaultMode;modes.p=defaultMode;}
-  // auto-suggest open/close based on existing positions
   ['c','p'].forEach(tp=>{
     const row=chain[i], hasPos=positions.find(p=>p.type===tp&&Math.abs(p.K-row.K)<0.1&&p.dte===dte);
     ocMode[tp]=hasPos?'close':'open';
   });
   fillTicket(chain[i],volOpts);
+  // always switch to Order Ticket tab when a strike is clicked
+  document.querySelectorAll('.tb-b').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.tc').forEach(x=>x.classList.remove('on'));
+  document.querySelector('[data-tab="ticket"]').classList.add('on');
+  document.getElementById('tab-ticket').classList.add('on');
+  // set side based on bid/ask click
+  if(side){
+    setSide('c', side);
+    setSide('p', side);
+  }
 }
 
 // ── Fill ticket ───────────────────────────────────────────────
