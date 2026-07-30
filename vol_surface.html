@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vol Surface — AAPL</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0e12; --surf:#111418; --panel:#161a20;
+  --b1:rgba(255,255,255,.06); --b2:rgba(255,255,255,.10);
+  --t1:#e2e8f0; --t2:#8896a8; --t3:#3d4f63;
+  --accent:#3b82f6; --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
+  --strike:#dfe3ea;
+  /* blue/violet split — calls blue, puts violet, theo neutral */
+  --bid:#7aa8d8; --ask:#9a8fd4; --theo:#c2c8d4;
+  --biv:#6a9ac8; --aiv:#8a7fc8; --tiv:#aab0c0;
+  --put:#9a8fd4; --call:#7ab0e0;
+  --mono:'DM Mono',monospace; --sans:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);font-family:var(--sans);font-size:13px;color:var(--t1);}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px;}
+
+/* HEADER */
+.hd{display:flex;align-items:center;height:46px;background:var(--surf);border-bottom:1px solid var(--b1);padding:0 18px;gap:14px;flex-wrap:wrap;}
+.hd-tkr{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--t1);letter-spacing:.05em;padding:4px 10px;border-radius:3px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.22);}
+.hd-px{font-family:var(--mono);font-size:18px;font-weight:600;}
+.hd-chg{font-family:var(--mono);font-size:11px;color:var(--green);}
+.hd-sep{width:1px;height:20px;background:var(--b2);}
+.hd-st{display:flex;flex-direction:column;gap:1px;}
+.hd-sl{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);}
+.hd-sv{font-family:var(--mono);font-size:11.5px;color:var(--t2);}
+.hd-title{font-size:13px;font-weight:600;margin-left:auto;color:var(--t3);}
+
+/* EXPIRY BAR */
+.eb{display:flex;align-items:center;gap:2px;height:34px;padding:0 18px;background:var(--surf);border-bottom:1px solid var(--b1);overflow-x:auto;}
+.eb-l{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);margin-right:8px;white-space:nowrap;}
+.eb-b{padding:3px 10px;border-radius:3px;border:1px solid transparent;background:transparent;color:var(--t3);font-family:var(--mono);font-size:11px;cursor:pointer;white-space:nowrap;transition:all .1s;}
+.eb-b:hover{color:var(--t2);border-color:var(--b2);}
+.eb-b.on{color:var(--t1);border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.07);}
+
+/* SMILE PANEL */
+.smile-panel{padding:14px 18px 4px;border-bottom:1px solid var(--b1);}
+.sp-controls{display:flex;align-items:center;gap:14px;margin-bottom:8px;flex-wrap:wrap;}
+.axis-group{display:flex;align-items:center;gap:3px;}
+.axis-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-right:6px;}
+.axis-seg{display:flex;border:1px solid var(--b2);border-radius:3px;overflow:hidden;}
+.axis-b{padding:4px 11px;font-family:var(--mono);font-size:9px;font-weight:500;background:transparent;border:none;color:var(--t3);cursor:pointer;letter-spacing:.05em;text-transform:uppercase;transition:all .1s;}
+.axis-b.on{background:rgba(59,130,246,.15);color:var(--accent);}
+.axis-b:not(.on):hover{background:rgba(255,255,255,.04);color:var(--t2);}
+.smile-legend{display:flex;gap:14px;margin-left:auto;flex-wrap:wrap;}
+.sl-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3);}
+.sl-dot{width:8px;height:3px;border-radius:1px;}
+canvas{display:block;width:100%;}
+
+/* GRID */
+.grid-panel{padding:12px 18px 20px;}
+.gp-title{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:10px;}
+.grid-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;min-width:920px;}
+thead tr.h1 th{background:var(--surf);padding:6px 6px 2px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;}
+.h1-price{color:rgba(194,200,212,.5);text-align:center;border-bottom:1px solid rgba(194,200,212,.12);}
+.h1-vol{color:rgba(170,176,192,.5);text-align:center;border-bottom:1px solid rgba(170,176,192,.12);}
+.h1-k{text-align:center;background:rgba(223,227,234,.04);color:rgba(223,227,234,.3);}
+thead tr.h2 th{background:var(--surf);padding:1px 6px 5px;font-size:9px;letter-spacing:.02em;color:var(--t3);text-align:right;border-bottom:1px solid var(--b2);white-space:nowrap;}
+.h2-put{color:rgba(154,143,212,.6)!important;}
+.h2-call{color:rgba(122,184,212,.55)!important;}
+.h2-theo{color:rgba(194,200,212,.6)!important;}
+.h2-k{text-align:center!important;background:rgba(223,227,234,.04);color:rgba(223,227,234,.25)!important;}
+tbody tr{border-bottom:1px solid var(--b1);transition:background .07s;}
+tbody tr:hover{background:rgba(255,255,255,.025);}
+td{padding:4px 6px;text-align:right;white-space:nowrap;color:var(--t2);}
+.putc{color:var(--put);} .callc{color:var(--call);} .theoc{color:var(--theo);}
+.td-k{text-align:center;font-weight:600;font-size:12px;color:var(--strike);background:rgba(223,227,234,.05);border-left:1px solid rgba(223,227,234,.07);border-right:1px solid rgba(223,227,234,.07);padding:4px 12px;letter-spacing:.02em;}
+.sep-l{border-left:1px solid var(--b1);}
+.atm-row{border-top:1px solid rgba(59,130,246,.28)!important;border-bottom:1px solid rgba(59,130,246,.28)!important;}
+.atm-row .td-k{color:var(--accent);background:rgba(59,130,246,.07);border-color:rgba(59,130,246,.2);}
+.sel-row{background:rgba(245,158,11,.09)!important;box-shadow:inset 2px 0 0 var(--amber),inset -2px 0 0 var(--amber);}
+.sel-row td{color:var(--t1);}
+.sel-row .td-k{color:var(--amber);background:rgba(245,158,11,.1);}
+#smile-canvas{cursor:crosshair;}
+.atm-tag{display:block;font-size:7px;color:var(--accent);letter-spacing:.12em;opacity:.75;}
+.block-price{background:rgba(194,200,212,.02);}
+.block-vol{background:rgba(154,143,212,.025);}
+
+/* STATUS */
+.sb{display:flex;align-items:center;gap:16px;height:26px;padding:0 18px;background:var(--bg);border-top:1px solid var(--b1);font-size:10px;color:var(--t3);}
+.sb .hl{font-family:var(--mono);color:var(--t2);}
+.ldot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2.4s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* tooltip */
+.tip{position:fixed;z-index:99;background:var(--panel);border:1px solid var(--b2);border-radius:4px;padding:8px 10px;font-family:var(--mono);font-size:10px;color:var(--t1);pointer-events:none;opacity:0;transition:opacity .12s;line-height:1.5;}
+.tip.show{opacity:1;}
+.tip-k{color:var(--t3);}
+
+/* context menu */
+.ctx{position:fixed;z-index:150;background:var(--panel);border:1px solid var(--b2);border-radius:5px;padding:4px;min-width:180px;box-shadow:0 8px 28px rgba(0,0,0,.5);opacity:0;transform:scale(.96);transform-origin:top left;transition:opacity .1s,transform .1s;pointer-events:none;}
+.ctx.show{opacity:1;transform:scale(1);pointer-events:auto;}
+.ctx-hdr{padding:6px 10px 5px;font-family:var(--mono);font-size:10px;color:var(--t3);border-bottom:1px solid var(--b1);margin-bottom:4px;}
+.ctx-hdr .k{color:var(--strike);font-weight:500;}
+.ctx-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:3px;font-size:11px;color:var(--t2);cursor:pointer;transition:background .08s;}
+.ctx-item:hover{background:rgba(59,130,246,.12);color:var(--t1);}
+.ctx-item .ic{color:var(--accent);font-size:12px;}
+
+/* modal */
+.modal-scrim{position:fixed;inset:0;z-index:200;background:rgba(6,9,14,.6);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .15s;}
+.modal-scrim.show{opacity:1;pointer-events:auto;}
+.modal{width:640px;max-width:calc(100vw - 32px);max-height:calc(100vh - 48px);overflow-y:auto;background:var(--surf);border:1px solid var(--b2);border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.6);transform:translateY(8px);transition:transform .15s;}
+.modal-scrim.show .modal{transform:translateY(0);}
+.modal-hd{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--b1);position:sticky;top:0;background:var(--surf);z-index:2;}
+.modal-hd .m-tkr{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--t1);padding:3px 9px;border-radius:3px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.22);letter-spacing:.05em;}
+.modal-hd .m-k{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--strike);}
+.modal-hd .m-exp{font-size:11px;color:var(--t3);font-family:var(--mono);}
+.modal-close{margin-left:auto;width:26px;height:26px;border-radius:4px;border:1px solid var(--b2);background:transparent;color:var(--t3);cursor:pointer;font-size:14px;line-height:1;transition:all .1s;}
+.modal-close:hover{border-color:rgba(239,68,68,.4);color:var(--red);}
+.modal-body{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+.mtc{background:var(--panel);border:1px solid var(--b1);border-radius:5px;padding:12px;}
+.mtc.cc{border-top:1px solid rgba(122,184,212,.25);}
+.mtc.pc{border-top:1px solid rgba(154,143,212,.3);}
+.mtk{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;}
+.mtk.c{color:var(--call);} .mtk.p{color:var(--put);}
+.mti{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;}
+.mtii{display:flex;flex-direction:column;gap:2px;}
+.mtil{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);}
+.mtiv{font-family:var(--mono);font-size:11.5px;color:var(--t1);}
+.mfr{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.mfl{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);width:52px;flex-shrink:0;}
+.mfi{font-family:var(--mono);font-size:11.5px;background:var(--bg);border:1px solid var(--b2);border-radius:3px;color:var(--t1);padding:4px 8px;outline:none;transition:border-color .1s;}
+.mfi:focus{border-color:rgba(59,130,246,.5);}
+.mfi.w76{width:76px;} .mfi.w56{width:56px;text-align:center;}
+.mseg{display:flex;border:1px solid var(--b2);border-radius:3px;overflow:hidden;}
+.msb{padding:4px 11px;font-family:var(--mono);font-size:9px;font-weight:500;background:transparent;border:none;color:var(--t3);cursor:pointer;letter-spacing:.05em;text-transform:uppercase;transition:all .1s;}
+.msb.on{background:rgba(59,130,246,.15);color:var(--accent);}
+.msb:not(.on):hover{background:rgba(255,255,255,.04);color:var(--t2);}
+.msb.ab{background:rgba(34,197,94,.14);color:var(--green);}
+.msb.as{background:rgba(239,68,68,.14);color:var(--red);}
+.mvhint{font-family:var(--mono);font-size:9px;color:var(--t3);}
+.mos{margin-top:8px;padding:7px 9px;background:var(--bg);border:1px solid var(--b1);border-radius:3px;font-size:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.mos-desc{font-family:var(--mono);color:var(--t2);font-size:9.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.mos-d{font-family:var(--mono);font-weight:500;color:var(--red);white-space:nowrap;}
+.mos-c{font-family:var(--mono);font-weight:500;color:var(--green);white-space:nowrap;}
+.mbtn-row{display:flex;gap:6px;margin-top:8px;}
+.mbtn-b,.mbtn-s{flex:1;padding:7px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-radius:3px;cursor:pointer;transition:opacity .1s;font-family:var(--sans);border:1px solid;}
+.mbtn-b{background:rgba(34,197,94,.10);border-color:rgba(34,197,94,.28);color:var(--green);}
+.mbtn-s{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.28);color:var(--red);}
+.mbtn-b:hover,.mbtn-s:hover{opacity:.75;}
+
+/* toast */
+.toast{position:fixed;bottom:18px;right:18px;z-index:300;background:var(--panel);border:1px solid var(--b2);border-radius:4px;padding:9px 13px;font-family:var(--mono);font-size:11px;color:var(--t1);transform:translateY(50px);opacity:0;transition:all .2s;pointer-events:none;max-width:360px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.tb{border-left:2px solid var(--green);} .toast.ts{border-left:2px solid var(--red);}
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <span class="hd-tkr">AAPL</span>
+  <span class="hd-px">182.63</span>
+  <span class="hd-chg">+1.24  +0.68%</span>
+  <div class="hd-sep"></div>
+  <div class="hd-st"><span class="hd-sl">IV30</span><span class="hd-sv">22.8%</span></div>
+  <div class="hd-st"><span class="hd-sl">IV Rank</span><span class="hd-sv">34.2</span></div>
+  <div class="hd-st"><span class="hd-sl">HV30</span><span class="hd-sv">18.4%</span></div>
+  <div class="hd-st"><span class="hd-sl">Fwd</span><span class="hd-sv">183.10</span></div>
+  <span class="hd-title">Volatility Surface</span>
+</div>
+
+<div class="eb">
+  <span class="eb-l">Expiry</span>
+  <button class="eb-b" data-dte="7"   data-lbl="Jun 6 '25">Jun 6 <span style="opacity:.35;font-size:9px">7d</span></button>
+  <button class="eb-b" data-dte="14"  data-lbl="Jun 13 '25">Jun 13 <span style="opacity:.35;font-size:9px">14d</span></button>
+  <button class="eb-b on" data-dte="30" data-lbl="Jun 30 '25">Jun 30 <span style="opacity:.35;font-size:9px">30d</span></button>
+  <button class="eb-b" data-dte="60"  data-lbl="Jul 30 '25">Jul 30 <span style="opacity:.35;font-size:9px">60d</span></button>
+  <button class="eb-b" data-dte="90"  data-lbl="Aug 29 '25">Aug 29 <span style="opacity:.35;font-size:9px">90d</span></button>
+  <button class="eb-b" data-dte="180" data-lbl="Nov '25">Nov '25 <span style="opacity:.35;font-size:9px">180d</span></button>
+</div>
+
+<div class="smile-panel">
+  <div class="sp-controls">
+    <div class="axis-group">
+      <span class="axis-lbl">X-Axis</span>
+      <div class="axis-seg" id="axis-seg">
+        <button class="axis-b on" data-axis="delta" onclick="setAxis('delta')">Delta</button>
+        <button class="axis-b" data-axis="moneyness" onclick="setAxis('moneyness')">Moneyness</button>
+        <button class="axis-b" data-axis="logm" onclick="setAxis('logm')">Log-M</button>
+      </div>
+    </div>
+    <div class="smile-legend">
+      <div class="sl-item"><div class="sl-dot" style="background:#7aa8d8"></div>Bid IV</div>
+      <div class="sl-item"><div class="sl-dot" style="background:var(--theo)"></div>Theo IV</div>
+      <div class="sl-item"><div class="sl-dot" style="background:var(--ask)"></div>Ask IV</div>
+      <div class="sl-item"><div class="sl-dot" style="background:var(--t3)"></div>ATM</div>
+    </div>
+  </div>
+  <canvas id="smile-canvas" height="260"></canvas>
+</div>
+
+<div class="grid-panel">
+  <div class="gp-title">Strike Grid — Price &amp; Vol · <span id="grid-exp" style="color:var(--t2)">Jun 30 '25</span></div>
+  <div class="grid-wrap">
+    <table id="grid-table">
+      <thead>
+        <tr class="h1">
+          <th colspan="6" class="h1-price">Price</th>
+          <th class="h1-k">Strike</th>
+          <th colspan="6" class="h1-vol">Vol (IV %)</th>
+        </tr>
+        <tr class="h2">
+          <th class="h2-put">P Bid</th><th class="h2-put">P Theo</th><th class="h2-put">P Ask</th>
+          <th class="h2-call">C Bid</th><th class="h2-call">C Theo</th><th class="h2-call">C Ask</th>
+          <th class="h2-k">—</th>
+          <th class="h2-put">P Bid</th><th class="h2-put">P Theo</th><th class="h2-put">P Ask</th>
+          <th class="h2-call">C Bid</th><th class="h2-call">C Theo</th><th class="h2-call">C Ask</th>
+        </tr>
+      </thead>
+      <tbody id="grid-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="sb">
+  <div style="display:flex;align-items:center;gap:5px"><div class="ldot"></div><span>Live</span></div>
+  <span>AAPL</span>
+  <span>Expiry <span class="hl" id="sb-exp">Jun 30 '25</span></span>
+  <span>DTE <span class="hl" id="sb-dte">30</span></span>
+  <span>Axis <span class="hl" id="sb-axis">Delta</span></span>
+  <span style="margin-left:auto;font-size:9px;opacity:.3">Black-Scholes theo · bid/ask IV inverted from quotes · put-call smile</span>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<!-- context menu -->
+<div class="ctx" id="ctx">
+  <div class="ctx-hdr">Strike <span class="k" id="ctx-k">—</span> · <span id="ctx-exp">—</span></div>
+  <div class="ctx-item" onclick="openTicketFromCtx()"><span class="ic">⬡</span> Send to Order Ticket</div>
+</div>
+
+<!-- order ticket modal -->
+<div class="modal-scrim" id="modal-scrim">
+  <div class="modal" id="modal">
+    <div class="modal-hd">
+      <span class="m-tkr">AAPL</span>
+      <span class="m-k" id="m-k">—</span>
+      <span class="m-exp" id="m-exp">—</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="mtc pc"><div class="mtk p">Put</div><div id="m-put-body"></div></div>
+      <div class="mtc cc"><div class="mtk c">Call</div><div id="m-call-body"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const S=182.63, R=0.045;
+
+function ncdf(x){
+  const a=[.254829592,-.284496736,1.421413741,-1.453152027,1.061405429],p=.3275911;
+  const s=x<0?-1:1,t=1/(1+p*Math.abs(x));
+  return .5*(1+s*(1-((((a[4]*t+a[3])*t+a[2])*t+a[1])*t+a[0])*t*Math.exp(-x*x/2)));
+}
+function bsPrice(S,K,T,r,v,tp){
+  if(T<.0001) return Math.max(0,tp==='c'?S-K:K-S);
+  const sq=Math.sqrt(T),d1=(Math.log(S/K)+(r+v*v/2)*T)/(v*sq),d2=d1-v*sq;
+  return tp==='c'? S*ncdf(d1)-K*Math.exp(-r*T)*ncdf(d2) : K*Math.exp(-r*T)*(1-ncdf(d2))-S*(1-ncdf(d1));
+}
+function bsDelta(S,K,T,r,v,tp){
+  if(T<.0001) return tp==='c'?(S>K?1:0):(S<K?-1:0);
+  const sq=Math.sqrt(T),d1=(Math.log(S/K)+(r+v*v/2)*T)/(v*sq);
+  return tp==='c'?ncdf(d1):ncdf(d1)-1;
+}
+const f2=n=>parseFloat(n).toFixed(2);
+
+let dte=30, lbl="Jun 30 '25", axis='delta';
+
+// build smile: for each strike a mid IV with skew, then bid/ask IV
+function buildSurface(d){
+  const T=d/365, baseIV=.20+d/365*.05, step=2.5;
+  const lo=Math.round(S*.82/step)*step, hi=Math.round(S*1.18/step)*step, rows=[];
+  for(let K=lo;K<=hi;K+=step){
+    K=parseFloat(K.toFixed(2));
+    const m=Math.log(K/S);
+    // skew: downside vol higher, mild smile curvature
+    const skew=-0.35*m + 0.8*m*m;
+    const midIV=Math.max(.06, baseIV+skew);
+    const ivSp=Math.max(.004, midIV*.02);
+    const bidIV=midIV-ivSp, askIV=midIV+ivSp;
+    const put={
+      bid:bsPrice(S,K,T,R,bidIV,'p'), theo:bsPrice(S,K,T,R,midIV,'p'), ask:bsPrice(S,K,T,R,askIV,'p'),
+      delta:bsDelta(S,K,T,R,midIV,'p')
+    };
+    const call={
+      bid:bsPrice(S,K,T,R,bidIV,'c'), theo:bsPrice(S,K,T,R,midIV,'c'), ask:bsPrice(S,K,T,R,askIV,'c'),
+      delta:bsDelta(S,K,T,R,midIV,'c')
+    };
+    rows.push({K, m, moneyness:K/S, midIV, bidIV, askIV, put, call,
+      callDelta:call.delta, putDelta:put.delta});
+  }
+  return rows;
+}
+
+let surface=[];
+let selK=null;      // selected strike (by K value)
+let smileGeo=null;  // {xp,yp,pL,pR,pT,cW,cH} stashed each draw for hit-testing
+
+function xValue(row){
+  if(axis==='delta') return row.callDelta;      // 1..0 across strikes
+  if(axis==='moneyness') return row.moneyness;  // K/S
+  return row.m;                                  // log-moneyness
+}
+function xLabel(row){
+  if(axis==='delta') return row.callDelta.toFixed(2);
+  if(axis==='moneyness') return row.moneyness.toFixed(3);
+  return row.m.toFixed(3);
+}
+
+// ── Smile chart ──
+function drawSmile(){
+  const cv=document.getElementById('smile-canvas');
+  const W=cv.parentElement.offsetWidth||760; cv.width=W; cv.height=260;
+  const ctx=cv.getContext('2d'); ctx.clearRect(0,0,W,260);
+
+  const xs=surface.map(xValue);
+  let xmin=Math.min(...xs), xmax=Math.max(...xs);
+  // delta axis reads high→low left→right for calls; keep natural but invert so ITM calls left
+  const invertX = axis==='delta';
+  const allIV=surface.flatMap(r=>[r.bidIV*100,r.askIV*100]);
+  const ymin=Math.min(...allIV)-0.5, ymax=Math.max(...allIV)+0.5;
+  const pL=48,pR=16,pT=14,pB=36,cW=W-pL-pR,cH=260-pT-pB;
+  const xp=v=>{ let t=(v-xmin)/(xmax-xmin); if(invertX) t=1-t; return pL+t*cW; };
+  const yp=v=>pT+(ymax-v)/(ymax-ymin)*cH;
+  // stash geometry so the click handler can map pixels → strike
+  smileGeo={xp,yp,pL,pR,pT,cW,cH};
+
+  // grid + y labels
+  ctx.strokeStyle='rgba(255,255,255,.04)'; ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){ const v=ymin+(ymax-ymin)*i/5, y=yp(v);
+    ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pR,y);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.18)';ctx.font='9px DM Mono,monospace';ctx.textAlign='right';
+    ctx.fillText(v.toFixed(1)+'%',pL-5,y+3);
+  }
+  // x labels (every few)
+  ctx.fillStyle='rgba(255,255,255,.2)';ctx.font='9px DM Mono,monospace';ctx.textAlign='center';
+  surface.forEach((r,i)=>{ if(i%3===0) ctx.fillText(xLabel(r),xp(xValue(r)),pT+cH+16); });
+  // axis title
+  ctx.fillStyle='rgba(255,255,255,.3)';ctx.font='9px DM Sans,sans-serif';
+  const axisName={delta:'Call Delta',moneyness:'Moneyness (K/S)',logm:'Log-Moneyness ln(K/S)'}[axis];
+  ctx.fillText(axisName, pL+cW/2, 258);
+
+  // ATM marker
+  const atm=surface.reduce((a,b)=>Math.abs(a.K-S)<Math.abs(b.K-S)?a:b,surface[0]);
+  const ax=xp(xValue(atm));
+  ctx.strokeStyle='rgba(120,140,165,.25)';ctx.lineWidth=1;ctx.setLineDash([3,4]);
+  ctx.beginPath();ctx.moveTo(ax,pT);ctx.lineTo(ax,pT+cH);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(120,140,165,.4)';ctx.font='9px DM Sans,sans-serif';ctx.textAlign='center';
+  ctx.fillText('ATM',ax,pT-3);
+
+  const drawCurve=(key,color,width,dash)=>{
+    ctx.strokeStyle=color;ctx.lineWidth=width;ctx.setLineDash(dash||[]);
+    ctx.beginPath();
+    surface.forEach((r,i)=>{ const x=xp(xValue(r)),y=yp(r[key]*100); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    ctx.stroke();ctx.setLineDash([]);
+  };
+  // ask (top), theo (mid), bid (bottom)
+  drawCurve('askIV','rgba(154,143,212,.7)',1.2);
+  drawCurve('bidIV','rgba(122,168,216,.8)',1.2);
+  drawCurve('midIV','rgba(194,200,212,.95)',2);
+  // theo dots
+  surface.forEach(r=>{ ctx.beginPath();ctx.arc(xp(xValue(r)),yp(r.midIV*100),2.4,0,Math.PI*2);ctx.fillStyle='rgba(194,200,212,.9)';ctx.fill(); });
+
+  // selected-strike marker
+  if(selK!=null){
+    const sr=surface.find(r=>r.K===selK);
+    if(sr){
+      const x=xp(xValue(sr));
+      // vertical guide
+      ctx.strokeStyle='rgba(245,158,11,.5)';ctx.lineWidth=1;ctx.setLineDash([2,3]);
+      ctx.beginPath();ctx.moveTo(x,pT);ctx.lineTo(x,pT+cH);ctx.stroke();ctx.setLineDash([]);
+      // rings on all three curves
+      [['askIV','rgba(154,143,212,.95)'],['midIV','rgba(245,158,11,1)'],['bidIV','rgba(122,168,216,.95)']].forEach(([k,c])=>{
+        const y=yp(sr[k]*100);
+        ctx.beginPath();ctx.arc(x,y,4.5,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=1.6;ctx.stroke();
+      });
+      // strike label chip at top
+      ctx.fillStyle='rgba(245,158,11,.9)';ctx.font='600 9px DM Mono,monospace';ctx.textAlign='center';
+      ctx.fillText(sr.K.toFixed(2),x,pT-3);
+    }
+  }
+}
+
+// ── Grid ──
+function renderGrid(){
+  const atm=surface.reduce((a,b)=>Math.abs(a.K-S)<Math.abs(b.K-S)?a:b,surface[0]);
+  const body=document.getElementById('grid-body');
+  body.innerHTML=surface.map(r=>{
+    const isAtm=r.K===atm.K;
+    const isSel=r.K===selK;
+    const pv=v=>(v*100).toFixed(2);
+    return `<tr class="${isAtm?'atm-row':''} ${isSel?'sel-row':''}" data-k="${r.K}">
+      <td class="putc block-price">${f2(r.put.bid)}</td>
+      <td class="theoc block-price">${f2(r.put.theo)}</td>
+      <td class="putc block-price">${f2(r.put.ask)}</td>
+      <td class="callc block-price sep-l">${f2(r.call.bid)}</td>
+      <td class="theoc block-price">${f2(r.call.theo)}</td>
+      <td class="callc block-price">${f2(r.call.ask)}</td>
+      <td class="td-k">${isAtm?'<span class="atm-tag">ATM</span>':''}${r.K.toFixed(2)}</td>
+      <td class="putc block-vol">${pv(r.bidIV)}</td>
+      <td class="theoc block-vol">${pv(r.midIV)}</td>
+      <td class="putc block-vol">${pv(r.askIV)}</td>
+      <td class="callc block-vol sep-l">${pv(r.bidIV)}</td>
+      <td class="theoc block-vol">${pv(r.midIV)}</td>
+      <td class="callc block-vol">${pv(r.askIV)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Controls ──
+function rebuild(){
+  surface=buildSurface(dte);
+  // drop selection if that strike isn't in the new expiry's chain
+  if(selK!=null && !surface.some(r=>r.K===selK)) selK=null;
+  drawSmile(); renderGrid();
+}
+function setAxis(a){
+  axis=a;
+  document.querySelectorAll('#axis-seg .axis-b').forEach(b=>b.classList.toggle('on',b.dataset.axis===a));
+  document.getElementById('sb-axis').textContent={delta:'Delta',moneyness:'Moneyness',logm:'Log-M'}[a];
+  drawSmile();
+}
+document.querySelectorAll('.eb-b').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.eb-b').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); dte=parseInt(b.dataset.dte); lbl=b.dataset.lbl;
+    document.getElementById('sb-exp').textContent=lbl;
+    document.getElementById('sb-dte').textContent=dte;
+    document.getElementById('grid-exp').textContent=lbl;
+    rebuild();
+  });
+});
+// click on smile → select nearest strike by x-position
+function smileClick(e){
+  if(!smileGeo||!surface.length) return;
+  const cv=document.getElementById('smile-canvas');
+  const rect=cv.getBoundingClientRect();
+  const px=(e.clientX-rect.left)*(cv.width/rect.width);
+  // find strike whose plotted x is closest to click x
+  let best=null,bestD=Infinity;
+  surface.forEach(r=>{
+    const x=smileGeo.xp(xValue(r));
+    const d=Math.abs(x-px);
+    if(d<bestD){bestD=d;best=r;}
+  });
+  if(!best) return;
+  selK=best.K;
+  drawSmile();
+  renderGrid();
+  // scroll the highlighted row into view
+  const tr=document.querySelector(`#grid-body tr[data-k="${best.K}"]`);
+  if(tr) tr.scrollIntoView({behavior:'smooth',block:'center'});
+}
+document.getElementById('smile-canvas').addEventListener('click',smileClick);
+
+// ─────────────────────────────────────────────────────────────
+//  Right-click → context menu → order ticket modal
+// ─────────────────────────────────────────────────────────────
+let ctxK=null;   // strike the context menu is acting on
+
+function nearestStrikeFromSmile(e){
+  if(!smileGeo||!surface.length) return null;
+  const cv=document.getElementById('smile-canvas');
+  const rect=cv.getBoundingClientRect();
+  const px=(e.clientX-rect.left)*(cv.width/rect.width);
+  let best=null,bestD=Infinity;
+  surface.forEach(r=>{ const x=smileGeo.xp(xValue(r)),d=Math.abs(x-px); if(d<bestD){bestD=d;best=r;} });
+  return best?best.K:null;
+}
+
+function showCtx(x,y,K){
+  ctxK=K;
+  const ctx=document.getElementById('ctx');
+  document.getElementById('ctx-k').textContent=K.toFixed(2);
+  document.getElementById('ctx-exp').textContent=lbl;
+  ctx.style.left=x+'px'; ctx.style.top=y+'px';
+  ctx.classList.add('show');
+  // flip if off-screen
+  requestAnimationFrame(()=>{
+    const r=ctx.getBoundingClientRect();
+    if(r.right>window.innerWidth) ctx.style.left=(x-r.width)+'px';
+    if(r.bottom>window.innerHeight) ctx.style.top=(y-r.height)+'px';
+  });
+}
+function hideCtx(){ document.getElementById('ctx').classList.remove('show'); }
+
+// smile right-click
+document.getElementById('smile-canvas').addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  const K=nearestStrikeFromSmile(e);
+  if(K==null) return;
+  selK=K; drawSmile(); renderGrid();
+  showCtx(e.clientX,e.clientY,K);
+});
+// grid right-click (delegated)
+document.getElementById('grid-body').addEventListener('contextmenu',e=>{
+  const tr=e.target.closest('tr[data-k]');
+  if(!tr) return;
+  e.preventDefault();
+  const K=parseFloat(tr.dataset.k);
+  selK=K; drawSmile(); renderGrid();
+  showCtx(e.clientX,e.clientY,K);
+});
+// dismiss menu on any outside click / escape / scroll
+document.addEventListener('click',e=>{ if(!e.target.closest('#ctx')) hideCtx(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){hideCtx();closeModal();} });
+window.addEventListener('scroll',hideCtx,true);
+
+// ── Modal ticket ──
+const mModes={p:'px',c:'px'};
+
+function openTicketFromCtx(){
+  hideCtx();
+  if(ctxK==null) return;
+  openTicket(ctxK);
+}
+
+function openTicket(K){
+  const row=surface.find(r=>r.K===K);
+  if(!row) return;
+  document.getElementById('m-k').textContent=K.toFixed(2);
+  document.getElementById('m-exp').textContent=lbl+' · '+dte+'d';
+  mModes.p='px'; mModes.c='px';
+  ['p','c'].forEach(tp=>fillModalLeg(tp,row));
+  document.getElementById('modal-scrim').classList.add('show');
+}
+function closeModal(){ document.getElementById('modal-scrim').classList.remove('show'); }
+document.getElementById('modal-scrim').addEventListener('click',e=>{ if(e.target.id==='modal-scrim') closeModal(); });
+
+function fillModalLeg(tp,row){
+  const isc=tp==='c';
+  const leg=isc?row.call:row.put;
+  const bidIV=(row.bidIV*100).toFixed(2), askIV=(row.askIV*100).toFixed(2), midIV=(row.midIV*100).toFixed(2);
+  const el=document.getElementById(isc?'m-call-body':'m-put-body');
+  const mode=mModes[tp];
+  el.innerHTML=`
+    <div class="mti">
+      <div class="mtii"><span class="mtil">Bid</span><span class="mtiv">${f2(leg.bid)}</span></div>
+      <div class="mtii"><span class="mtil">Theo</span><span class="mtiv theoc">${f2(leg.theo)}</span></div>
+      <div class="mtii"><span class="mtil">Ask</span><span class="mtiv">${f2(leg.ask)}</span></div>
+      <div class="mtii"><span class="mtil">Bid IV</span><span class="mtiv">${bidIV}%</span></div>
+      <div class="mtii"><span class="mtil">Theo IV</span><span class="mtiv theoc">${midIV}%</span></div>
+      <div class="mtii"><span class="mtil">Ask IV</span><span class="mtiv">${askIV}%</span></div>
+    </div>
+    <div class="mfr">
+      <span class="mfl">Action</span>
+      <div class="mseg" id="m-${tp}-seg">
+        <button class="msb ab" data-s="b" onclick="mSetSide('${tp}','b')">Buy</button>
+        <button class="msb" data-s="s" onclick="mSetSide('${tp}','s')">Sell</button>
+      </div>
+    </div>
+    <div class="mfr">
+      <span class="mfl">Qty</span>
+      <input class="mfi w56" id="m-${tp}-qty" type="number" value="1" min="1" oninput="mUpd('${tp}')">
+      <span style="font-size:9px;color:var(--t3)">contracts</span>
+    </div>
+    <div class="mfr">
+      <span class="mfl">Order by</span>
+      <div class="mseg" id="m-${tp}-mseg">
+        <button class="msb ${mode==='px'?'on':''}" onclick="mSetMode('${tp}','px')">Price</button>
+        <button class="msb ${mode==='vol'?'on':''}" onclick="mSetMode('${tp}','vol')">Vol</button>
+      </div>
+    </div>
+    <div class="mfr" id="m-${tp}-px-row" style="${mode==='vol'?'display:none':''}">
+      <span class="mfl">Price</span>
+      <input class="mfi w76" id="m-${tp}-px" type="number" value="${f2(leg.theo)}" step="0.01" oninput="mPxChanged('${tp}')">
+      <span class="mvhint" id="m-${tp}-px-hint">→ ${midIV}% IV</span>
+    </div>
+    <div class="mfr" id="m-${tp}-vol-row" style="${mode==='px'?'display:none':''}">
+      <span class="mfl">Vol %</span>
+      <input class="mfi w76" id="m-${tp}-vol" type="number" value="${midIV}" step="0.1" oninput="mVolChanged('${tp}')">
+      <span class="mvhint" id="m-${tp}-vol-hint">→ $${f2(leg.theo)}</span>
+    </div>
+    <div class="mos">
+      <span class="mos-desc" id="m-${tp}-desc"></span>
+      <span class="mos-d" id="m-${tp}-cost"></span>
+    </div>
+    <div class="mbtn-row">
+      <button class="mbtn-b" onclick="mSend('${tp}','b')">Buy ${isc?'Call':'Put'}</button>
+      <button class="mbtn-s" onclick="mSend('${tp}','s')">Sell ${isc?'Call':'Put'}</button>
+    </div>`;
+  mUpd(tp);
+}
+function mSetSide(tp,s){
+  document.getElementById(`m-${tp}-seg`).querySelectorAll('.msb').forEach(b=>{
+    b.classList.remove('ab','as'); if(b.dataset.s===s) b.classList.add(s==='b'?'ab':'as');
+  });
+  mUpd(tp);
+}
+function mSetMode(tp,m){
+  mModes[tp]=m;
+  document.querySelectorAll(`#m-${tp}-mseg .msb`).forEach(b=>b.classList.toggle('on',b.textContent.toLowerCase()===m));
+  document.getElementById(`m-${tp}-px-row`).style.display=m==='px'?'':'none';
+  document.getElementById(`m-${tp}-vol-row`).style.display=m==='vol'?'':'none';
+  mUpd(tp);
+}
+function mCurRow(){ return surface.find(r=>r.K===parseFloat(document.getElementById('m-k').textContent)); }
+function mPxChanged(tp){
+  const row=mCurRow(); if(!row) return;
+  const px=parseFloat(document.getElementById(`m-${tp}-px`).value)||0;
+  const iv=impliedVolLocal(row.K,px,tp);
+  const h=document.getElementById(`m-${tp}-px-hint`);
+  if(h) h.textContent=iv?'→ '+(iv*100).toFixed(2)+'% IV':'→ —';
+  mUpd(tp);
+}
+function mVolChanged(tp){
+  const row=mCurRow(); if(!row) return;
+  const v=parseFloat(document.getElementById(`m-${tp}-vol`).value)||0;
+  const px=v>0?bsPrice(S,row.K,dte/365,R,v/100,tp):0;
+  const h=document.getElementById(`m-${tp}-vol-hint`);
+  if(h) h.textContent=px>0?'→ $'+f2(px):'→ —';
+  mUpd(tp);
+}
+// local implied-vol solver (Newton-Raphson)
+function impliedVolLocal(K,mktPx,tp){
+  const T=dte/365; if(T<.0001||mktPx<=0) return null;
+  let v=.25;
+  for(let i=0;i<60;i++){
+    const p0=bsPrice(S,K,T,R,v,tp);
+    const sq=Math.sqrt(T),d1=(Math.log(S/K)+(R+v*v/2)*T)/(v*sq);
+    const vega=S*Math.exp(-d1*d1/2)/Math.sqrt(2*Math.PI)*sq;
+    const diff=p0-mktPx;
+    if(Math.abs(diff)<1e-7||Math.abs(vega)<1e-10) break;
+    v=v-diff/vega; if(v<.001)v=.001; if(v>20)v=20;
+  }
+  return v;
+}
+function mUpd(tp){
+  const row=mCurRow(); if(!row) return;
+  const isc=tp==='c';
+  const qty=parseInt(document.getElementById(`m-${tp}-qty`)?.value)||1;
+  const s=document.querySelector(`#m-${tp}-seg .ab,#m-${tp}-seg .as`)?.dataset.s||'b';
+  const mode=mModes[tp];
+  let px,ivStr;
+  if(mode==='px'){
+    px=parseFloat(document.getElementById(`m-${tp}-px`)?.value)||0;
+    const iv=impliedVolLocal(row.K,px,tp); ivStr=iv?' @ '+(iv*100).toFixed(2)+'% IV':'';
+  } else {
+    const v=parseFloat(document.getElementById(`m-${tp}-vol`)?.value)||0;
+    px=v>0?bsPrice(S,row.K,dte/365,R,v/100,tp):0; ivStr=' @ '+v.toFixed(2)+'% IV';
+  }
+  const tot=(px*100*qty).toFixed(2);
+  const desc=document.getElementById(`m-${tp}-desc`),cost=document.getElementById(`m-${tp}-cost`);
+  if(desc) desc.textContent=`${s==='b'?'BUY':'SELL'} ${qty} AAPL ${row.K} ${isc?'C':'P'} LMT @ ${f2(px)}${ivStr}`;
+  if(cost){ cost.textContent=s==='b'?`$${tot} debit`:`$${tot} credit`; cost.className=s==='b'?'mos-d':'mos-c'; }
+}
+function mSend(tp,s){
+  const row=mCurRow(); if(!row) return;
+  const qty=document.getElementById(`m-${tp}-qty`)?.value||1;
+  const mode=mModes[tp];
+  let px,ivStr;
+  if(mode==='px'){ px=f2(parseFloat(document.getElementById(`m-${tp}-px`)?.value||0));
+    const iv=impliedVolLocal(row.K,parseFloat(px),tp); ivStr=iv?' ('+(iv*100).toFixed(2)+'% IV)':''; }
+  else { const v=parseFloat(document.getElementById(`m-${tp}-vol`)?.value||0);
+    px=f2(bsPrice(S,row.K,dte/365,R,v/100,tp)); ivStr=` (${v.toFixed(2)}% IV)`; }
+  toast(`${s==='b'?'BUY':'SELL'} ${qty}× AAPL ${row.K} ${tp==='c'?'CALL':'PUT'} @ ${px}${ivStr} — Sent`,s);
+  closeModal();
+}
+function toast(msg,s){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show '+(s==='b'?'tb':'ts');
+  clearTimeout(t._to); t._to=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+window.addEventListener('resize',drawSmile);
+window.setAxis=setAxis;
+window.openTicketFromCtx=openTicketFromCtx; window.closeModal=closeModal;
+window.mSetSide=mSetSide; window.mSetMode=mSetMode; window.mUpd=mUpd;
+window.mPxChanged=mPxChanged; window.mVolChanged=mVolChanged; window.mSend=mSend;
+
+rebuild();
+</script>
+</body>
+</html>
